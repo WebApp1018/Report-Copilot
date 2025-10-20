@@ -1,16 +1,46 @@
 const mongoose = require('mongoose');
 
-// Customer schema: represents a person that places orders or bookings.
+// Customer schema: represents a person (or contact) that places orders or bookings.
+// We retain the original simple fields for backwards compatibility and add richer attributes.
 const CustomerSchema = new mongoose.Schema(
     {
-        name: { type: String, required: true, trim: true },
+        // Original basics
+        name: { type: String, required: true, trim: true }, // kept; also store first/last
         email: { type: String, required: true, unique: true, lowercase: true, index: true },
         city: { type: String, index: true },
         state: { type: String },
         tags: [{ type: String }],
+
+        // New richer fields
+        firstName: { type: String, trim: true, index: true },
+        lastName: { type: String, trim: true, index: true },
+        phone: { type: String, trim: true, index: true }, // E.164 preferred
+        companyName: { type: String, trim: true },
+        address1: { type: String, trim: true },
+        address2: { type: String, trim: true },
+        postalCode: { type: String, trim: true, index: true },
+        country: { type: String, trim: true, index: true },
+        marketingOptIn: { type: Boolean, default: false, index: true },
+        loyaltyPoints: { type: Number, default: 0 },
+        lifetimeValue: { type: Number, default: 0 }, // aggregated purchase value snapshot
+        lastOrderDate: { type: Date },
+        segment: { type: String, enum: ['CONSUMER', 'BUSINESS', 'ENTERPRISE', 'VIP'], default: 'CONSUMER', index: true },
+        preferredLanguage: { type: String, default: 'en' },
+        timezone: { type: String },
+        notes: { type: String },
     },
     { timestamps: true }
 );
+
+// Virtual fullName if first/last exist (falls back to stored name)
+CustomerSchema.virtual('fullName').get(function () {
+    if (this.firstName || this.lastName) {
+        return [this.firstName, this.lastName].filter(Boolean).join(' ');
+    }
+    return this.name;
+});
+
+// Post-save hook to keep lifetimeValue & lastOrderDate loosely updated could be added later.
 
 /**
  * Static: Top customers for a given month (by total order amount).

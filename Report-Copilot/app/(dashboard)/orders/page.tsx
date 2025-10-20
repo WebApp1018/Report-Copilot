@@ -1,25 +1,51 @@
 "use client";
 import DataTable from '@/components/DataTable';
 import { useListData } from '@/components/useListData';
-import { Chip, Stack, Typography, LinearProgress, Alert, Button, TextField, IconButton } from '@mui/material';
-import SortIcon from '@mui/icons-material/Sort';
+import { Stack, LinearProgress, Alert, Button, IconButton, Tooltip } from '@mui/material';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { exportCSV } from '@/lib/export';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import PageHeader from '@/components/PageHeader';
 
 export default function OrdersPage() {
     const { rows, loading, error, reload, setSearch, setSort, query } = useListData({ path: '/api/orders', initialQuery: { page: 1, pageSize: 50, sort: 'orderDate', order: 'desc' } });
     const toggleSort = () => setSort(query.sort || 'orderDate', query.order === 'asc' ? 'desc' : 'asc');
+    const columns = [
+        { field: 'orderNumber', label: 'Order #' },
+        { field: 'orderDate', label: 'Date' },
+        { field: 'status', label: 'Status' },
+        { field: 'paymentMethod', label: 'Payment' },
+        { field: 'sourceChannel', label: 'Channel' },
+        { field: 'subtotalAmount', label: 'Subtotal', numeric: true },
+        { field: 'discountAmount', label: 'Discount', numeric: true },
+        { field: 'shippingCost', label: 'Shipping', numeric: true },
+        { field: 'taxAmount', label: 'Tax', numeric: true },
+        { field: 'grandTotal', label: 'Grand Total', numeric: true },
+    ];
+    const handleExport = () => exportCSV(columns, rows, 'orders.csv');
     return (
         <Stack spacing={2}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="h5" fontWeight={600}>Orders</Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                    <TextField size="small" placeholder="Search notes/status" onChange={e => setSearch(e.target.value)} />
-                    <IconButton size="small" onClick={toggleSort}><SortIcon fontSize="small" /></IconButton>
-                    <Chip color="secondary" label="Recent" size="small" />
-                </Stack>
-            </Stack>
+            <PageHeader
+                icon={ReceiptLongIcon}
+                title="Orders"
+                badge="Read only"
+                sortOrder={query.order as 'asc' | 'desc'}
+                onToggleSort={toggleSort}
+                onSearch={(val) => setSearch(val)}
+                searchPlaceholder="Search notes/status"
+                actionsRight={
+                    <Tooltip title="Export CSV">
+                        <span>
+                            <IconButton size="small" onClick={handleExport} disabled={!rows.length} aria-label="Export CSV">
+                                <FileDownloadIcon fontSize="inherit" />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                }
+            />
             {loading && <LinearProgress />}
             {error && <Alert severity="error" action={<Button size="small" onClick={() => reload()}>Retry</Button>}>{error}</Alert>}
-            <DataTable columns={[{ field: 'orderDate', label: 'Date' }, 'status', { field: 'totalAmount', label: 'Total', numeric: true }]} rows={rows} emptyMessage="No orders" />
+            <DataTable columns={columns} rows={rows} emptyMessage="No orders" exportable exportFileName="orders.csv" />
         </Stack>
     );
 }

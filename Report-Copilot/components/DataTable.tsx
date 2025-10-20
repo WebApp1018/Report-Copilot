@@ -1,5 +1,6 @@
 "use client";
-import { Paper, Table, TableHead, TableRow, TableCell, TableBody, Typography, TableSortLabel, Box, Select, MenuItem, IconButton } from '@mui/material';
+import { Paper, Table, TableHead, TableRow, TableCell, TableBody, Typography, TableSortLabel, Box, Select, MenuItem, IconButton, Divider, Tooltip } from '@mui/material';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useState, useMemo } from 'react';
@@ -12,9 +13,11 @@ interface DataTableProps {
     emptyMessage?: string;
     dense?: boolean;
     initialPageSize?: number;
+    exportable?: boolean;
+    exportFileName?: string;
 }
 
-export default function DataTable({ columns, rows, emptyMessage, dense, initialPageSize = 10 }: DataTableProps) {
+export default function DataTable({ columns, rows, emptyMessage, dense, initialPageSize = 10, exportable, exportFileName }: DataTableProps) {
     const normalized = useMemo(() => columns.map(c => typeof c === 'string' ? { field: c, label: c } : { field: c.field, label: c.label || c.field, numeric: c.numeric }), [columns]);
     const [orderBy, setOrderBy] = useState<string | null>(null);
     const [order, setOrder] = useState<'asc' | 'desc'>('asc');
@@ -51,18 +54,53 @@ export default function DataTable({ columns, rows, emptyMessage, dense, initialP
     };
 
     const totalPages = Math.ceil(rows.length / pageSize);
+    const rangeStart = rows.length === 0 ? 0 : page * pageSize + 1;
+    const rangeEnd = Math.min(rows.length, (page * pageSize) + paged.length);
+
+    function toCSV(): string {
+        const header = normalized.map(c => escapeCSV(c.label)).join(',');
+        const body = sorted.map(row => normalized.map(c => escapeCSV(rawCell(row[c.field]))).join(',')).join('\n');
+        return header + '\n' + body;
+    }
+
+    function rawCell(v: any) {
+        if (v == null) return '';
+        if (v instanceof Date) return v.toISOString();
+        if (typeof v === 'object') return JSON.stringify(v);
+        return String(v);
+    }
+
+    function escapeCSV(val: string) {
+        if (val.includes('"')) val = val.replace(/"/g, '""');
+        if (/[",\n]/.test(val)) return '"' + val + '"';
+        return val;
+    }
+
+    function handleExport() {
+        const csv = toCSV();
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = exportFileName || `report-copilot-${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
     return (
-        <Paper elevation={1} sx={{ width: '100%', overflowX: 'auto' }}>
-            <Table size={dense ? 'small' : 'medium'} stickyHeader>
+        <Paper elevation={1} sx={(t) => ({ width: '100%', overflowX: 'auto', borderRadius: 3, background: t.palette.mode === 'light' ? 'linear-gradient(180deg,#ffffff,#f9fafc)' : 'linear-gradient(180deg,#1e1e1e,#242629)', border: `1px solid ${t.palette.divider}` })}>
+            <Table size={dense ? 'small' : 'medium'} stickyHeader sx={{ '& .MuiTableCell-stickyHeader': { background: (t) => t.palette.mode === 'light' ? '#f1f5f9' : '#2d2f33' } }}>
                 <TableHead>
                     <TableRow>
                         {normalized.map(col => (
-                            <TableCell key={col.field} sx={{ fontWeight: 600, fontSize: 12 }} align={col.numeric ? 'right' : 'left'}>
+                            <TableCell key={col.field} align={col.numeric ? 'right' : 'left'} sx={{ fontWeight: 600, fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
                                 <TableSortLabel
                                     active={orderBy === col.field}
                                     direction={orderBy === col.field ? order : 'asc'}
                                     onClick={() => handleSort(col.field)}
+                                    sx={{ '&:hover': { color: 'primary.main' }, '&.Mui-active': { color: 'primary.main' } }}
                                 >
                                     {col.label}
                                 </TableSortLabel>
@@ -73,33 +111,54 @@ export default function DataTable({ columns, rows, emptyMessage, dense, initialP
                 <TableBody>
                     {paged.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={normalized.length} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={normalized.length} align="center" sx={{ py: 5 }}>
                                 <Typography variant="body2" color="text.secondary">{emptyMessage || 'No data'}</Typography>
                             </TableCell>
                         </TableRow>
                     )}
                     {paged.map((r, idx) => (
-                        <TableRow key={idx} hover>
+                        <TableRow
+                            key={idx}
+                            hover
+                            sx={(t) => ({
+                                backgroundColor: idx % 2 === 0 ? (t.palette.mode === 'light' ? '#ffffff' : '#1e1e1e') : (t.palette.mode === 'light' ? '#f8fafc' : '#232323'),
+                                '&:last-of-type td': { borderBottom: 0 },
+                                transition: 'background-color .15s ease',
+                                '&:hover': { backgroundColor: t.palette.action.hover },
+                            })}
+                        >
                             {normalized.map(c => (
-                                <TableCell key={c.field} align={c.numeric ? 'right' : 'left'}>{formatCell(r[c.field])}</TableCell>
+                                <TableCell key={c.field} align={c.numeric ? 'right' : 'left'} sx={{ borderBottom: (t) => `1px solid ${t.palette.divider}`, fontSize: dense ? 13 : 14 }}>
+                                    {formatCell(r[c.field])}
+                                </TableCell>
                             ))}
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
+            <Divider sx={{ mt: 0 }} />
             {/* Pagination controls */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1, gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.25, flexWrap: 'wrap', gap: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <IconButton size="small" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))}><ArrowBackIcon fontSize="inherit" /></IconButton>
                     <IconButton size="small" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}><ArrowForwardIcon fontSize="inherit" /></IconButton>
-                    <Typography variant="caption">Page {totalPages === 0 ? 0 : page + 1} / {totalPages}</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 500 }}>Page {totalPages === 0 ? 0 : page + 1} / {totalPages}</Typography>
+                    <Typography variant="caption" color="text.secondary">Rows {rangeStart}-{rangeEnd} of {rows.length}</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="caption">Rows per page</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 500 }}>Rows per page</Typography>
                     <Select size="small" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}>
                         {[5, 10, 25, 50].map(sz => <MenuItem key={sz} value={sz}>{sz}</MenuItem>)}
                     </Select>
-                    <Typography variant="caption">Total: {rows.length}</Typography>
+                    {exportable && (
+                        <Tooltip title="Export CSV (all rows)">
+                            <span>
+                                <IconButton size="small" onClick={handleExport} disabled={rows.length === 0} aria-label="Export CSV">
+                                    <FileDownloadIcon fontSize="inherit" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
                 </Box>
             </Box>
         </Paper>

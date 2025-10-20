@@ -1,25 +1,51 @@
 "use client";
 import DataTable from '@/components/DataTable';
 import { useListData } from '@/components/useListData';
-import { Chip, Stack, Typography, LinearProgress, Alert, Button, TextField, IconButton } from '@mui/material';
-import SortIcon from '@mui/icons-material/Sort';
+import { Stack, LinearProgress, Alert, Button, IconButton, Tooltip } from '@mui/material';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { exportCSV } from '@/lib/export';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
+import PageHeader from '@/components/PageHeader';
 
 export default function ProductsPage() {
     const { rows, loading, error, reload, setSearch, setSort, query } = useListData({ path: '/api/products', initialQuery: { page: 1, pageSize: 50, sort: 'createdAt', order: 'desc' } });
     const toggleSort = () => setSort(query.sort || 'createdAt', query.order === 'asc' ? 'desc' : 'asc');
+    const columns = [
+        { field: 'name', label: 'Name' },
+        { field: 'sku', label: 'SKU' },
+        { field: 'category', label: 'Category' },
+        { field: 'brand', label: 'Brand' },
+        { field: 'stockQty', label: 'Stock', numeric: true },
+        { field: 'reorderLevel', label: 'Reorder', numeric: true },
+        { field: 'unitPrice', label: 'Price', numeric: true },
+        { field: 'costPrice', label: 'Cost', numeric: true },
+        { field: 'msrp', label: 'MSRP', numeric: true },
+        { field: 'marginPct', label: 'Margin %', numeric: true },
+        { field: 'discontinued', label: 'Discontinued' },
+    ];
+    const handleExport = () => exportCSV(columns, rows, 'products.csv');
     return (
         <Stack spacing={2}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="h5" fontWeight={600}>Products</Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                    <TextField size="small" placeholder="Search" onChange={e => setSearch(e.target.value)} />
-                    <IconButton size="small" onClick={toggleSort}><SortIcon fontSize="small" /></IconButton>
-                    <Chip color="primary" label="Inventory" size="small" />
-                </Stack>
-            </Stack>
+            <PageHeader
+                icon={Inventory2Icon}
+                title="Products"
+                badge="Read only"
+                sortOrder={query.order as 'asc' | 'desc'}
+                onToggleSort={toggleSort}
+                onSearch={(val) => setSearch(val)}
+                actionsRight={
+                    <Tooltip title="Export CSV">
+                        <span>
+                            <IconButton size="small" onClick={handleExport} disabled={!rows.length} aria-label="Export CSV">
+                                <FileDownloadIcon fontSize="inherit" />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                }
+            />
             {loading && <LinearProgress />}
             {error && <Alert severity="error" action={<Button size="small" onClick={() => reload()}>Retry</Button>}>{error}</Alert>}
-            <DataTable columns={[{ field: 'name' }, { field: 'sku' }, { field: 'category' }, { field: 'unitPrice', label: 'Price', numeric: true }]} rows={rows} emptyMessage="No products" />
+            <DataTable columns={columns} rows={rows} emptyMessage="No products" exportable exportFileName="products.csv" />
         </Stack>
     );
 }

@@ -30,7 +30,8 @@ npm run dev
 
 ## Seed
 ```bash
-npm run seed
+set SEED_CHUNK_SIZE=1000
+node seed.js --from=2021-01-01 --to=2025-10-20 --customers=500 --products=300 --orders=5000 --bookings=2000
 ```
 
 ## Contributing
