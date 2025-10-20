@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+/* Removed deprecated @theme inline for Tailwind v4 + DaisyUI compatibility */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+  min-height: 100vh;
+}
+
+/* MUI + Tailwind blending: keep base variables, rely on MUI theme for palette. */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body[data-mode='dark'] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* Utility overrides placeholder */
