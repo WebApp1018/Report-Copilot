@@ -1,5 +1,5 @@
 "use client";
-import { Paper, Table, TableHead, TableRow, TableCell, TableBody, Typography, TableSortLabel, Box, Select, MenuItem, IconButton, Divider, Tooltip } from '@mui/material';
+import { Paper, Table, TableHead, TableRow, TableCell, TableBody, Typography, TableSortLabel, Box, Select, MenuItem, IconButton, Divider, Tooltip, TableContainer } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -15,9 +15,11 @@ interface DataTableProps {
     initialPageSize?: number;
     exportable?: boolean;
     exportFileName?: string;
+    /** Optional max height for vertical scroll confinement */
+    maxHeight?: number;
 }
 
-export default function DataTable({ columns, rows, emptyMessage, dense, initialPageSize = 10, exportable, exportFileName }: DataTableProps) {
+export default function DataTable({ columns, rows, emptyMessage, dense, initialPageSize = 10, exportable, exportFileName, maxHeight }: DataTableProps) {
     const normalized = useMemo(() => columns.map(c => typeof c === 'string' ? { field: c, label: c } : { field: c.field, label: c.label || c.field, numeric: c.numeric }), [columns]);
     const [orderBy, setOrderBy] = useState<string | null>(null);
     const [order, setOrder] = useState<'asc' | 'desc'>('asc');
@@ -90,52 +92,54 @@ export default function DataTable({ columns, rows, emptyMessage, dense, initialP
     }
 
     return (
-        <Paper elevation={1} sx={(t) => ({ width: '100%', overflowX: 'auto', borderRadius: 3, background: t.palette.mode === 'light' ? 'linear-gradient(180deg,#ffffff,#f9fafc)' : 'linear-gradient(180deg,#1e1e1e,#242629)', border: `1px solid ${t.palette.divider}` })}>
-            <Table size={dense ? 'small' : 'medium'} stickyHeader sx={{ '& .MuiTableCell-stickyHeader': { background: (t) => t.palette.mode === 'light' ? '#f1f5f9' : '#2d2f33' } }}>
-                <TableHead>
-                    <TableRow>
-                        {normalized.map(col => (
-                            <TableCell key={col.field} align={col.numeric ? 'right' : 'left'} sx={{ fontWeight: 600, fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
-                                <TableSortLabel
-                                    active={orderBy === col.field}
-                                    direction={orderBy === col.field ? order : 'asc'}
-                                    onClick={() => handleSort(col.field)}
-                                    sx={{ '&:hover': { color: 'primary.main' }, '&.Mui-active': { color: 'primary.main' } }}
-                                >
-                                    {col.label}
-                                </TableSortLabel>
-                            </TableCell>
-                        ))}
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {paged.length === 0 && (
+        <Paper elevation={1} sx={(t) => ({ width: '100%', borderRadius: 3, background: t.palette.mode === 'light' ? 'linear-gradient(180deg,#ffffff,#f9fafc)' : 'linear-gradient(180deg,#1e1e1e,#242629)', border: `1px solid ${t.palette.divider}`, display: 'flex', flexDirection: 'column' })}>
+            <TableContainer className="data-scroll" sx={{ overflowX: 'auto', overflowY: maxHeight ? 'auto' : 'visible', maxHeight: maxHeight || 'none', borderRadius: 3 }}>
+                <Table size={dense ? 'small' : 'medium'} stickyHeader sx={{ overflowX: 'auto', minWidth: '100%', '& .MuiTableCell-stickyHeader': { background: (t) => t.palette.mode === 'light' ? '#f1f5f9' : '#2d2f33' } }}>
+                    <TableHead>
                         <TableRow>
-                            <TableCell colSpan={normalized.length} align="center" sx={{ py: 5 }}>
-                                <Typography variant="body2" color="text.secondary">{emptyMessage || 'No data'}</Typography>
-                            </TableCell>
-                        </TableRow>
-                    )}
-                    {paged.map((r, idx) => (
-                        <TableRow
-                            key={idx}
-                            hover
-                            sx={(t) => ({
-                                backgroundColor: idx % 2 === 0 ? (t.palette.mode === 'light' ? '#ffffff' : '#1e1e1e') : (t.palette.mode === 'light' ? '#f8fafc' : '#232323'),
-                                '&:last-of-type td': { borderBottom: 0 },
-                                transition: 'background-color .15s ease',
-                                '&:hover': { backgroundColor: t.palette.action.hover },
-                            })}
-                        >
-                            {normalized.map(c => (
-                                <TableCell key={c.field} align={c.numeric ? 'right' : 'left'} sx={{ borderBottom: (t) => `1px solid ${t.palette.divider}`, fontSize: dense ? 13 : 14 }}>
-                                    {formatCell(r[c.field])}
+                            {normalized.map(col => (
+                                <TableCell key={col.field} align={col.numeric ? 'right' : 'left'} sx={{ fontWeight: 600, fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
+                                    <TableSortLabel
+                                        active={orderBy === col.field}
+                                        direction={orderBy === col.field ? order : 'asc'}
+                                        onClick={() => handleSort(col.field)}
+                                        sx={{ '&:hover': { color: 'primary.main' }, '&.Mui-active': { color: 'primary.main' } }}
+                                    >
+                                        {col.label}
+                                    </TableSortLabel>
                                 </TableCell>
                             ))}
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHead>
+                    <TableBody>
+                        {paged.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={normalized.length} align="center" sx={{ py: 5 }}>
+                                    <Typography variant="body2" color="text.secondary">{emptyMessage || 'No data'}</Typography>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {paged.map((r, idx) => (
+                            <TableRow
+                                key={idx}
+                                hover
+                                sx={(t) => ({
+                                    backgroundColor: idx % 2 === 0 ? (t.palette.mode === 'light' ? '#ffffff' : '#1e1e1e') : (t.palette.mode === 'light' ? '#f8fafc' : '#232323'),
+                                    '&:last-of-type td': { borderBottom: 0 },
+                                    transition: 'background-color .15s ease',
+                                    '&:hover': { backgroundColor: t.palette.action.hover },
+                                })}
+                            >
+                                {normalized.map(c => (
+                                    <TableCell key={c.field} align={c.numeric ? 'right' : 'left'} sx={{ borderBottom: (t) => `1px solid ${t.palette.divider}`, fontSize: dense ? 13 : 14 }}>
+                                        {formatCell(r[c.field])}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
             <Divider sx={{ mt: 0 }} />
             {/* Pagination controls */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.25, flexWrap: 'wrap', gap: 2 }}>

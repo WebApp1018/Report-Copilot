@@ -32,4 +32,60 @@ body[data-mode='dark'] {
   --foreground: #ededed;
 }
 
+.MuiBox-root {
+  overflow: auto;
+}
 /* Utility overrides placeholder */
+
+/* Scrollbar design tokens */
+:root {
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --scrollbar-border: #ffffff;
+}
+body[data-mode='dark'] {
+  --scrollbar-track: #1e242b;
+  --scrollbar-thumb: #3c4550;
+  --scrollbar-thumb-hover: #556270;
+  --scrollbar-border: #0f1317;
+}
+
+/* Generic custom scrollbar (Webkit browsers) */
+.data-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.data-scroll::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 8px;
+}
+.data-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,var(--scrollbar-thumb),var(--scrollbar-thumb-hover));
+  border-radius: 8px;
+  border: 2px solid var(--scrollbar-track);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.data-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,var(--scrollbar-thumb-hover),var(--scrollbar-thumb));
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+}
+.data-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+.data-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Optional: hide scrollbar when not scrolling (overlay effect) */
+@media (hover: hover) {
+  .data-scroll[data-hide-scrollbar='true']::-webkit-scrollbar-thumb { background: transparent; }
+  .data-scroll[data-hide-scrollbar='true']:hover::-webkit-scrollbar-thumb { background: linear-gradient(180deg,var(--scrollbar-thumb),var(--scrollbar-thumb-hover)); }
+}
+
+/* Utility: force smooth scroll */
+.data-scroll { scroll-behavior: smooth; }

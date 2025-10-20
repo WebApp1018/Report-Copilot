@@ -162,6 +162,19 @@ function sanitizeSpec(spec) {
     return spec;
 }
 
+// Ensure a primary display field (name) is always present for Customer/Product find queries
+function ensureDisplayField(spec) {
+    if ((spec.type === 'mongo-find') && ['Customer', 'Product'].includes(spec.collection)) {
+        if (!spec.fields.includes('name')) {
+            spec.fields.unshift('name');
+        }
+        if (spec.projection && spec.projection.name !== 1) {
+            spec.projection.name = 1;
+        }
+    }
+    return spec;
+}
+
 // Post-process spec to correct common reasoning mistakes from the LLM.
 function postProcessSpec(question, spec) {
     try {
@@ -273,6 +286,7 @@ router.post('/query', async (req, res) => {
 
         applyTemporalGuard(question, spec);
         sanitizeSpec(spec);
+        ensureDisplayField(spec);
         // Inject additional heuristic rewrites (extend postProcessSpec here to keep order predictable)
         postProcessSpec(question, spec);
 
@@ -466,6 +480,92 @@ router.post('/query', async (req, res) => {
                     console.warn('Enrichment for product names failed', e);
                 }
             }
+        }
+
+        // Generic name enrichment for any result set missing names where IDs refer to products or customers.
+        try {
+            if (Array.isArray(data) && data.length > 0 && !data[0].name) {
+                const productIds = [];
+                const customerIds = [];
+                data.forEach(row => {
+                    if (row.productId && mongoose.Types.ObjectId.isValid(row.productId)) productIds.push(row.productId);
+                    if (row.customerId && mongoose.Types.ObjectId.isValid(row.customerId)) customerIds.push(row.customerId);
+                    // Heuristic: if collection is Product and _id looks like ObjectId and no name
+                    if (spec.collection === 'Product' && row._id && mongoose.Types.ObjectId.isValid(row._id)) productIds.push(row._id);
+                    if (spec.collection === 'Customer' && row._id && mongoose.Types.ObjectId.isValid(row._id)) customerIds.push(row._id);
+                    // Orders referencing customer via 'customer' field
+                    if (spec.collection === 'Order' && row.customer && mongoose.Types.ObjectId.isValid(row.customer)) customerIds.push(row.customer);
+                });
+                const unique = arr => Array.from(new Set(arr.map(id => id.toString())));
+                const prodUnique = unique(productIds);
+                const custUnique = unique(customerIds);
+                let prodMap = {}; let custMap = {};
+                if (prodUnique.length) {
+                    const prods = await Product.find({ _id: { $in: prodUnique } }, { name: 1, sku: 1, category: 1, brand: 1 }).lean();
+                    prodMap = Object.fromEntries(prods.map(p => [p._id.toString(), p]));
+                }
+                if (custUnique.length) {
+                    const custs = await Customer.find({ _id: { $in: custUnique } }, { name: 1, firstName: 1, lastName: 1, email: 1 }).lean();
+                    custMap = Object.fromEntries(custs.map(c => [c._id.toString(), c]));
+                }
+                if (Object.keys(prodMap).length || Object.keys(custMap).length) {
+                    data = data.map(row => {
+                        if (!row.name) {
+                            const pid = row.productId || (spec.collection === 'Product' ? row._id : null);
+                            const cid = row.customerId || (spec.collection === 'Customer' ? row._id : null);
+                            // Also support Order rows where 'customer' is ID
+                            if (!cid && spec.collection === 'Order' && row.customer && mongoose.Types.ObjectId.isValid(row.customer)) {
+                                cid = row.customer;
+                            }
+                            if (pid && prodMap[pid.toString()]) {
+                                const p = prodMap[pid.toString()];
+                                return { ...row, name: p.name, sku: p.sku, category: p.category, brand: p.brand };
+                            }
+                            if (cid && custMap[cid.toString()]) {
+                                const c = custMap[cid.toString()];
+                                const displayName = c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown Customer';
+                                return { ...row, name: displayName, email: c.email };
+                            }
+                        }
+                        return row;
+                    });
+                }
+                // Final guarantee for Product/Customer context: assign placeholder name
+                if (['Product', 'Customer'].includes(spec.collection)) {
+                    data = data.map(r => r.name ? r : { ...r, name: spec.collection === 'Product' ? 'Unknown Product' : 'Unknown Customer' });
+                }
+            }
+        } catch (e) {
+            console.warn('generic name enrichment failed', e);
+        }
+
+        // Dedicated enrichment: attach customerName/customerEmail for Order queries when only customer ObjectId present.
+        try {
+            if (spec.collection === 'Order' && Array.isArray(data) && data.length > 0) {
+                const lackingName = data.some(r => !r.customerName && r.customer && typeof r.customer === 'string');
+                if (lackingName) {
+                    const ids = Array.from(new Set(data.filter(r => r.customer).map(r => r.customer).filter(id => mongoose.Types.ObjectId.isValid(id))));
+                    if (ids.length) {
+                        const customers = await Customer.find({ _id: { $in: ids } }, { name: 1, firstName: 1, lastName: 1, email: 1 }).lean();
+                        const cMap = Object.fromEntries(customers.map(c => [c._id.toString(), c]));
+                        data = data.map(r => {
+                            if (r.customer && cMap[r.customer.toString()]) {
+                                const c = cMap[r.customer.toString()];
+                                const displayName = c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown Customer';
+                                return { ...r, customerName: displayName, customerEmail: c.email };
+                            }
+                            return r;
+                        });
+                        // Ensure spec.fields lists these for front-end column rendering
+                        if (Array.isArray(spec.fields)) {
+                            if (!spec.fields.includes('customerName')) spec.fields.push('customerName');
+                            if (!spec.fields.includes('customerEmail')) spec.fields.push('customerEmail');
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('order customer enrichment failed', e);
         }
 
         return res.json({ question, spec, count: data.length, data, description: spec.description || null, chart: spec.chart || null });
