@@ -55,7 +55,7 @@ export default function BookingsPage() {
             />
             {loading && <LinearProgress />}
             {error && <Alert severity="error" action={<Button size="small" onClick={() => reload()}>Retry</Button>}>{error}</Alert>}
-            <DataTable columns={columns} rows={enrichedRows} emptyMessage="No bookings" exportable exportFileName="bookings.csv" />
+            <DataTable columns={columns} rows={enrichedRows} emptyMessage="No bookings" exportable exportFileName="bookings.csv" badgeFields={["status", "bookingType", "paymentStatus"]} />
         </Stack>
     );
 }

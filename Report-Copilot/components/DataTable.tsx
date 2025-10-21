@@ -17,9 +17,11 @@ interface DataTableProps {
     exportFileName?: string;
     /** Optional max height for vertical scroll confinement */
     maxHeight?: number;
+    /** Fields that should render as badges (Chip) */
+    badgeFields?: string[];
 }
 
-export default function DataTable({ columns, rows, emptyMessage, dense, initialPageSize = 10, exportable, exportFileName, maxHeight }: DataTableProps) {
+export default function DataTable({ columns, rows, emptyMessage, dense, initialPageSize = 10, exportable, exportFileName, maxHeight, badgeFields = [] }: DataTableProps) {
     const normalized = useMemo(() => columns.map(c => typeof c === 'string' ? { field: c, label: c } : { field: c.field, label: c.label || c.field, numeric: c.numeric }), [columns]);
     const [orderBy, setOrderBy] = useState<string | null>(null);
     const [order, setOrder] = useState<'asc' | 'desc'>('asc');
@@ -132,7 +134,7 @@ export default function DataTable({ columns, rows, emptyMessage, dense, initialP
                             >
                                 {normalized.map(c => (
                                     <TableCell key={c.field} align={c.numeric ? 'right' : 'left'} sx={{ borderBottom: (t) => `1px solid ${t.palette.divider}`, fontSize: dense ? 13 : 14 }}>
-                                        {formatCell(r[c.field])}
+                                        {renderCell(c.field, r[c.field], !!c.numeric, badgeFields)}
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -192,4 +194,26 @@ function formatCell(v: any) {
     }
     if (typeof v === 'object') return JSON.stringify(v);
     return String(v);
+}
+
+// Badge color mapping heuristic
+function badgeColor(value: string) {
+    if (!value) return 'default';
+    const val = value.toLowerCase();
+    if (/unpaid|failed|cancelled|canceled|error|inactive|denied|refunded/.test(val)) return 'error';
+    if (/paid|completed|active|success|ok/.test(val)) return 'success';
+    if (/pending|in[- ]?progress|processing|open|business/.test(val)) return 'warning';
+    if (/draft|new|created|generated|confirmed|partial|consumer/.test(val)) return 'info';
+    if (/archived|closed|delivered|fulfilled|shipped|returned|vip/.test(val)) return 'secondary';
+    return 'default';
+}
+
+import { Chip } from '@mui/material';
+function renderCell(field: string, value: any, numeric: boolean, badgeFields: string[]) {
+    if (badgeFields.includes(field) && typeof value === 'string') {
+        return <Chip size="small" label={value} color={badgeColor(value) as any} variant={badgeColor(value) === 'default' ? 'outlined' : 'filled'} />;
+    }
+    // For numeric, still format numbers
+    if (numeric) return formatCell(value);
+    return formatCell(value);
 }

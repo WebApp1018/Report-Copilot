@@ -48,7 +48,7 @@ export default function CustomersPage() {
             />
             {loading && <LinearProgress />}
             {error && <Alert severity="error" action={<Button size="small" onClick={() => reload()}>Retry</Button>}>{error}</Alert>}
-            <DataTable columns={columns} rows={rows} emptyMessage="No customers" exportable exportFileName="customers.csv" />
+            <DataTable columns={columns} rows={rows} emptyMessage="No customers" exportable exportFileName="customers.csv" badgeFields={["segment"]} />
         </Stack>
     );
 }

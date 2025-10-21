@@ -17,6 +17,7 @@ const examples = [
     'Best selling products list this month',
     'Total booking price from customers in New York',
     'Revenue by city this month',
+    'Customers who ordered 15+'
 ];
 
 export default function AIReportPage() {

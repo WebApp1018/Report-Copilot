@@ -45,7 +45,7 @@ export default function OrdersPage() {
             />
             {loading && <LinearProgress />}
             {error && <Alert severity="error" action={<Button size="small" onClick={() => reload()}>Retry</Button>}>{error}</Alert>}
-            <DataTable columns={columns} rows={rows} emptyMessage="No orders" exportable exportFileName="orders.csv" />
+            <DataTable columns={columns} rows={rows} emptyMessage="No orders" exportable exportFileName="orders.csv" badgeFields={["status", "paymentMethod"]} />
         </Stack>
     );
 }
