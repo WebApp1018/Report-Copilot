@@ -1,5 +1,6 @@
 "use client";
-import { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DataTable from '@/components/DataTable';
 import { Button, Chip, Paper, Stack, TextField, Typography, Alert, CircularProgress, Box, InputAdornment, LinearProgress, IconButton, Tooltip, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import SimpleChart from '@/components/SimpleChart';
@@ -20,12 +21,13 @@ const examples = [
     'Customers who ordered 15+'
 ];
 
-export default function AIReportPage() {
+function AIReportContent() {
     const [question, setQuestion] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [controller, setController] = useState<AbortController | null>(null);
+    const searchParams = useSearchParams();
 
     async function runQuery(q: string) {
         if (!q.trim()) return;
@@ -60,6 +62,17 @@ export default function AIReportPage() {
         controller?.abort();
         setLoading(false);
     }
+
+    // Auto-run when ?q= is present (and only first mount or when q changes via URL)
+    useEffect(() => {
+        const initial = searchParams.get('q');
+        if (initial && initial !== question) {
+            setQuestion(initial);
+            // Slight timeout allows state to set before run
+            setTimeout(() => runQuery(initial), 0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     return (
         <Stack spacing={3}>
@@ -200,5 +213,13 @@ export default function AIReportPage() {
                 </Stack>
             </Paper>
         </Stack>
+    );
+}
+
+export default function AIReportPage() {
+    return (
+        <Suspense fallback={<Stack spacing={2} sx={{ p: 3 }}><Typography variant="body2" color="text.secondary">Loading AI report...</Typography></Stack>}>
+            <AIReportContent />
+        </Suspense>
     );
 }

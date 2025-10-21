@@ -8,6 +8,7 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import './dashboard.css';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -16,11 +17,12 @@ import { useTheme } from '@mui/material/styles';
 import { usePathname } from 'next/navigation';
 
 const navItems: { href: string; label: string; icon: React.ElementType }[] = [
-    { href: '/customers', label: 'Customers', icon: PeopleIcon },
-    { href: '/products', label: 'Products', icon: Inventory2Icon },
-    { href: '/orders', label: 'Orders', icon: ReceiptLongIcon },
-    { href: '/bookings', label: 'Bookings', icon: EventAvailableIcon },
-    { href: '/ai-report', label: 'AI Report', icon: SmartToyIcon },
+    { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+    { href: '/dashboard/customers', label: 'Customers', icon: PeopleIcon },
+    { href: '/dashboard/products', label: 'Products', icon: Inventory2Icon },
+    { href: '/dashboard/orders', label: 'Orders', icon: ReceiptLongIcon },
+    { href: '/dashboard/bookings', label: 'Bookings', icon: EventAvailableIcon },
+    { href: '/dashboard/ai-report', label: 'AI Report', icon: SmartToyIcon },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -69,7 +71,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
                 {navItems.map(item => {
                     const Icon = item.icon;
-                    const selected = pathname === item.href || pathname.startsWith(item.href + '/');
+                    // Only mark the top-level Dashboard tab active on exact match; others match nested routes.
+                    const selected = item.href === '/dashboard'
+                        ? pathname === item.href
+                        : (pathname === item.href || pathname.startsWith(item.href + '/'));
                     return (
                         <ListItemButton
                             key={item.href}
@@ -122,7 +127,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         }}
                     >
                         <BrandIcon fontSize="small" sx={{ width: 32, height: 32 }} />
-                        <Typography className="brand-text" variant="h6" sx={{ fontWeight: 600 }}>Report Copilot</Typography>
+                        <Typography
+                            variant="h6"
+                            fontWeight={700}
+                            sx={(t) => ({
+                                letterSpacing: .5,
+                                background: t.palette.mode === 'light'
+                                    ? 'linear-gradient(90deg,#1e2a62,#4a3fa3,#6c2ad3)'
+                                    : 'linear-gradient(90deg,#cdd9ff,#e2d8ff,#f0e9ff)',
+                                WebkitBackgroundClip: 'text',
+                                color: 'transparent'
+                            })}
+                        >
+                            Report Copilot
+                        </Typography>
                     </Box>
                     {isMdUp && (
                         <Tooltip title={collapsed ? 'Expand menu' : 'Collapse menu'} arrow>

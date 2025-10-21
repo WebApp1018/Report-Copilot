@@ -96,7 +96,7 @@ const CATEGORY_BUILDERS = [
                 { $limit: limitN },
                 { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'product' } },
                 { $unwind: '$product' },
-                { $project: { _id: 0, productId: '_id', name: '$product.name', sku: '$product.sku', category: '$product.category', brand: '$product.brand', totalQty: 1, revenue: 1, totalSales: '$revenue', avgUnitPrice: 1, orders: 1 } }
+                { $project: { _id: 0, productId: '$_id', name: '$product.name', sku: '$product.sku', category: '$product.category', brand: '$product.brand', totalQty: 1, revenue: 1, totalSales: '$revenue', avgUnitPrice: 1, orders: 1 } }
             );
             return {
                 type: 'mongo-aggregate',
@@ -121,7 +121,7 @@ const CATEGORY_BUILDERS = [
                 { $lookup: { from: 'customers', localField: 'customer', foreignField: '_id', as: 'customer' } },
                 { $unwind: '$customer' },
                 { $group: { _id: '$customer.city', totalRevenue: { $sum: '$grandTotal' } } },
-                { $project: { _id: 0, city: '_id', totalRevenue: 1 } },
+                { $project: { _id: 0, city: '$_id', totalRevenue: 1 } },
                 { $match: { city: { $ne: null } } },
                 { $sort: { totalRevenue: -1 } },
                 { $limit: 50 }

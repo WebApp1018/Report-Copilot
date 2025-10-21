@@ -32,9 +32,6 @@ body[data-mode='dark'] {
   --foreground: #ededed;
 }
 
-.MuiBox-root {
-  overflow: auto;
-}
 /* Utility overrides placeholder */
 
 /* Scrollbar design tokens */
