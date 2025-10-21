@@ -222,18 +222,6 @@ export default function Landing() {
                 )
               }}
               sx={{
-                '& .MuiOutlinedInput-root': {
-                  backdropFilter: 'blur(12px)',
-                  background: theme.palette.mode === 'light' ? 'rgba(255,255,255,0.7)' : 'rgba(30,34,38,0.55)',
-                  transition: 'background .35s, box-shadow .35s, border-color .35s',
-                  boxShadow: theme.palette.mode === 'light' ? '0 6px 26px -8px rgba(70,90,120,0.35)' : '0 6px 28px -10px rgba(0,0,0,0.7)',
-                  '&:hover': { background: theme.palette.mode === 'light' ? 'rgba(255,255,255,0.78)' : 'rgba(38,44,50,0.6)' },
-                  '&.Mui-focused': {
-                    background: theme.palette.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(50,56,62,0.85)',
-                    boxShadow: theme.palette.mode === 'light' ? '0 0 0 3px rgba(80,120,255,0.35)' : '0 0 0 3px rgba(120,160,255,0.35)',
-                    borderColor: theme.palette.primary.main
-                  }
-                },
                 '& .MuiInputBase-input::placeholder': {
                   opacity: 1,
                   transition: 'opacity .35s',
@@ -254,11 +242,6 @@ export default function Landing() {
                 // Hide caret pseudo-element while focused (user typing) or when there is user text
                 '& .MuiOutlinedInput-root.Mui-focused .MuiInputBase-input::after': {
                   display: 'none'
-                },
-                '& .MuiOutlinedInput-root.Mui-focused fieldset': {
-                  borderImage: theme.palette.mode === 'light'
-                    ? 'linear-gradient(90deg,#4a6bff,#8f54ff,#c146ff) 1'
-                    : 'linear-gradient(90deg,#6f8dff,#b08bff,#e2d4ff) 1'
                 },
                 '& .MuiOutlinedInput-root fieldset': {
                   transition: 'border-image .4s'
