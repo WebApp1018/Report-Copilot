@@ -170,7 +170,6 @@ export default function Landing() {
               <Stack direction="row" spacing={1}>
                 <Button component={Link} href="/dashboard" size="small">Dashboard</Button>
                 <Button component={Link} href="/dashboard/ai-report" size="small">AI Report</Button>
-                <Button component={Link} href="/dashboard" variant="contained" size="small">Launch</Button>
               </Stack>
             )}
             {isSmDown && (
