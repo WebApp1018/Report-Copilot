@@ -72,15 +72,84 @@ function resolveTemporalRange(question) {
         const end = new Date(start); end.setDate(end.getDate() + 1);
         return { start, end };
     }
+    // Generic: last N days / past N days (e.g., last 3 days)
+    const lastNDaysMatch = question.match(/(?:last|past)\s+(\d{1,3})\s+days?/i);
+    if (lastNDaysMatch) {
+        const n = parseInt(lastNDaysMatch[1], 10);
+        if (n > 0 && n <= 365) {
+            const end = new Date();
+            const start = new Date(end.getTime() - n * 86400000);
+            return { start, end };
+        }
+    }
+    // Last week / past week (ISO: treat week as last 7 days ending today)
+    if (/(last|past)\s+week/i.test(question)) {
+        const end = new Date();
+        const start = new Date(end.getTime() - 7 * 86400000);
+        return { start, end };
+    }
+    // Last N weeks / past N weeks
+    const lastNWeeksMatch = question.match(/(?:last|past)\s+(\d{1,2})\s+weeks?/i);
+    if (lastNWeeksMatch) {
+        const w = parseInt(lastNWeeksMatch[1], 10);
+        if (w > 0 && w <= 52) {
+            const end = new Date();
+            const start = new Date(end.getTime() - w * 7 * 86400000);
+            return { start, end };
+        }
+    }
     if (/last month/i.test(question)) {
         const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const end = new Date(now.getFullYear(), now.getMonth(), 1);
         return { start, end };
     }
+    // previous month alias
+    if (/previous month/i.test(question)) {
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 1);
+        return { start, end };
+    }
+    // last N months / past N months
+    const lastNMonthsMatch = question.match(/(?:last|past)\s+(\d{1,2})\s+months?/i);
+    if (lastNMonthsMatch) {
+        const m = parseInt(lastNMonthsMatch[1], 10);
+        if (m > 0 && m <= 24) {
+            const end = new Date();
+            const start = new Date(end.getFullYear(), end.getMonth() - m, end.getDate());
+            return { start, end };
+        }
+    }
     if (/last year/i.test(question)) {
         const start = new Date(now.getFullYear() - 1, 0, 1);
         const end = new Date(now.getFullYear(), 0, 1);
         return { start, end };
+    }
+    // last quarter / past quarter
+    if (/(last|past)\s+quarter/i.test(question)) {
+        const currentQuarter = Math.floor(now.getMonth() / 3);
+        const lastQuarter = (currentQuarter + 3 - 1) % 4; // previous quarter index
+        const yearAdjustment = currentQuarter === 0 ? -1 : 0;
+        const year = now.getFullYear() + yearAdjustment;
+        const start = new Date(year, lastQuarter * 3, 1);
+        const end = new Date(year, lastQuarter * 3 + 3, 1);
+        return { start, end };
+    }
+    // last N quarters / past N quarters
+    const lastNQuartersMatch = question.match(/(?:last|past)\s+(\d{1,2})\s+quarters?/i);
+    if (lastNQuartersMatch) {
+        const q = parseInt(lastNQuartersMatch[1], 10);
+        if (q > 0 && q <= 8) {
+            const end = new Date();
+            // Move back q quarters
+            const endQuarterIndex = Math.floor(end.getMonth() / 3);
+            const totalQuartersBack = q;
+            const startQuarterAbsolute = endQuarterIndex - totalQuartersBack;
+            let startYear = end.getFullYear();
+            let startQuarterIndex = startQuarterAbsolute;
+            while (startQuarterIndex < 0) { startQuarterIndex += 4; startYear -= 1; }
+            const start = new Date(startYear, startQuarterIndex * 3, 1);
+            return { start, end };
+        }
     }
     if (/past 7 days|last 7 days/i.test(question)) {
         const end = new Date();
@@ -129,7 +198,26 @@ function applyTemporalGuard(question, spec) {
         if (!injected) spec.pipeline.unshift({ $match: { [dateField]: dateMatch } });
     } else if (spec.type === 'mongo-find') {
         const dateField = inferDateField(spec.collection);
-        if (!spec.filter[dateField]) spec.filter[dateField] = dateMatch;
+        if (!spec.filter[dateField]) {
+            spec.filter[dateField] = dateMatch;
+        } else {
+            // Merge / correct partial filter (e.g., only $gte present) for dynamic phrases like last 3 days
+            const current = spec.filter[dateField];
+            // If it's a direct string date, wrap into range
+            if (typeof current === 'string') {
+                spec.filter[dateField] = { $gte: start, $lt: end };
+            } else if (typeof current === 'object' && !(current instanceof Date)) {
+                // Overwrite $gte/$gt if obviously outside desired window or missing $lt
+                const gteVal = current.$gte || current.$gt;
+                const ltVal = current.$lt || current.$lte;
+                const isOutOfRange = (gteVal instanceof Date && gteVal < start) || (typeof gteVal === 'string' && !gteVal.startsWith(start.toISOString().slice(0, 10)));
+                if (!gteVal || isOutOfRange) current.$gte = start;
+                if (!ltVal) current.$lt = end; // ensure an end bound
+                // Remove $gt/$lte inconsistent forms
+                if (current.$gt && !current.$gte) { current.$gte = current.$gt; delete current.$gt; }
+                if (current.$lte && !current.$lt) { current.$lt = current.$lte; delete current.$lte; }
+            }
+        }
     }
     return spec;
 }
@@ -271,6 +359,45 @@ router.post('/query', async (req, res) => {
                     return res.status(422).json({ error: 'Model did not return valid JSON', raw, cleaned });
                 }
             }
+        }
+
+        // Normalization: convert { "$date": "ISO" } wrappers inside filters/pipeline to native Date objects
+        function unwrapDates(obj) {
+            if (!obj || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) return obj.map(unwrapDates);
+            if (obj.$date && typeof obj.$date === 'string') {
+                const d = new Date(obj.$date);
+                if (!isNaN(d.getTime())) return d; // valid date
+            }
+            // Recurse keys
+            for (const k of Object.keys(obj)) {
+                obj[k] = unwrapDates(obj[k]);
+            }
+            return obj;
+        }
+        // Convert ISO string values under date comparison operators to Date objects (for find filters or match stages)
+        function convertISOComparators(obj) {
+            if (!obj || typeof obj !== 'object') return;
+            const ops = ['$gte', '$gt', '$lt', '$lte'];
+            for (const k of Object.keys(obj)) {
+                const v = obj[k];
+                if (v && typeof v === 'object' && !Array.isArray(v)) {
+                    convertISOComparators(v);
+                }
+                if (ops.includes(k) && typeof v === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) {
+                    const d = new Date(v);
+                    if (!isNaN(d.getTime())) obj[k] = d;
+                }
+            }
+        }
+        try {
+            unwrapDates(spec); // broad traversal over entire spec
+            convertISOComparators(spec.filter);
+            if (Array.isArray(spec.pipeline)) {
+                spec.pipeline.forEach(stage => { if (stage.$match) convertISOComparators(stage.$match); });
+            }
+        } catch (e) {
+            console.warn('unwrapDates normalization failed', e);
         }
 
         // Basic shape validation

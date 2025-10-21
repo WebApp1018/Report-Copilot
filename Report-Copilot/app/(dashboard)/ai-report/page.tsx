@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import DataTable from '@/components/DataTable';
-import { Button, Chip, Paper, Stack, TextField, Typography, Alert, CircularProgress, Box, InputAdornment, LinearProgress, IconButton, Tooltip } from '@mui/material';
+import { Button, Chip, Paper, Stack, TextField, Typography, Alert, CircularProgress, Box, InputAdornment, LinearProgress, IconButton, Tooltip, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import SimpleChart from '@/components/SimpleChart';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { exportCSV } from '@/lib/export';
@@ -10,6 +10,7 @@ import StopIcon from '@mui/icons-material/Stop';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import SearchIcon from '@mui/icons-material/Search';
 import PageHeader from '@/components/PageHeader';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 const examples = [
     'Who is the top customer this month?',
@@ -148,40 +149,51 @@ export default function AIReportPage() {
                                     <Typography variant="body2" color="text.secondary">{result.description}</Typography>
                                 </Paper>
                             )}
+                            <Accordion elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                    <Typography variant="caption" sx={{ fontWeight: 600 }}>Debug Info</Typography>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                    <Typography variant="caption" display="block">Spec Type: {result.spec?.type}</Typography>
+                                    <Typography variant="caption" display="block">Collection: {result.spec?.collection}</Typography>
+                                    <Typography variant="caption" display="block">Fields: {(result.spec?.fields || []).join(', ')}</Typography>
+                                    <Typography variant="caption" display="block">Row Count: {Array.isArray(result.data) ? result.data.length : 0}</Typography>
+                                    <Typography variant="caption" display="block" sx={{ mt: 1 }}>First Row JSON:</Typography>
+                                    <Box component="pre" sx={{ fontSize: 11, p: 1, backgroundColor: 'action.hover', borderRadius: 1, maxHeight: 150, overflow: 'auto' }}>
+                                        {JSON.stringify(Array.isArray(result.data) ? result.data[0] : null, null, 2)}
+                                    </Box>
+                                </AccordionDetails>
+                            </Accordion>
                             {(() => {
-                                // Derive columns & rows with special handling for single summary aggregates (e.g. {_id:null, totalBookingPrice: 12345})
-                                let rows: any[] = result.data || [];
-                                let columns: any = result.spec?.fields && result.spec.fields.length ? result.spec.fields : Object.keys(result.data?.[0] || {});
+                                // Derive columns & rows with special handling for single summary aggregates
+                                let rows: any[] = Array.isArray(result.data) ? result.data : [];
+                                let columns: any = (result.spec?.fields && result.spec.fields.length) ? result.spec.fields : (rows[0] ? Object.keys(rows[0]) : []);
 
                                 if (rows.length === 1) {
                                     const first = { ...rows[0] };
-                                    // Remove meaningless _id:null
                                     if (first._id === null) delete first._id;
                                     const keys = Object.keys(first);
-                                    // If exactly one meaningful metric field remains, display only that column.
                                     if (keys.length === 1) {
                                         const metricField = keys[0];
                                         columns = [metricField];
                                         rows = [{ [metricField]: first[metricField] }];
                                     } else {
-                                        // Otherwise show all remaining (excluding _id if removed)
                                         columns = keys;
                                         rows = [first];
                                     }
                                 }
 
+                                // Safety: ensure column labels are unique and non-empty
+                                columns = columns.filter((c: any) => !!c);
+                                if (!Array.isArray(rows)) rows = [];
+
                                 return <>
-                                    <DataTable columns={columns} rows={rows} emptyMessage="No rows" dense exportable exportFileName="ai-report.csv" />
+                                    <DataTable key={columns.join('|')} columns={columns} rows={rows} emptyMessage="No rows" dense exportable exportFileName="ai-report.csv" />
                                     {result.chart && result.chart.type !== 'table' && (
                                         <SimpleChart data={rows} spec={{ ...result.chart, title: result.description }} />
                                     )}
                                 </>;
                             })()}
-                            {result.chart && (
-                                <Alert severity="info" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                                    Chart meta: {JSON.stringify(result.chart, null, 2)}
-                                </Alert>
-                            )}
                         </Stack>
                     )}
                 </Stack>
